@@ -34,5 +34,5 @@ $ docker-compose build
 
 #### Team Members:
 * Aris Koutris, [akoutris@ethz.ch](mailto:akoutris@ethz.ch)
-* Aylin Akkus
+* Aylin Akkus,  [aakkus@ethz.ch](mailto:aakkus@ethz.ch)
 * George Manos, [gmanos@ethz.ch](mailto:gmanos@ethz.ch)
