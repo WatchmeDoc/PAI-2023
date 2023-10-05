@@ -1,4 +1,3 @@
-import numpy
 from scipy.stats import laplace, norm, t
 import scipy
 import math
@@ -43,7 +42,9 @@ def log_posterior_probs(x):
     assert x.ndim == 1
 
     # TODO: enter your code here
-
+    log_likelihoods = np.array([np.sum(dist.logpdf(x)) for dist in HYPOTHESIS_SPACE])
+    log_priors = np.log(PRIOR_PROBS)
+    log_p = log_likelihoods + log_priors - logsumexp(log_likelihoods + log_priors)
     assert log_p.shape == (3,)
     return log_p
 
