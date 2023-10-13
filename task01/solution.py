@@ -31,6 +31,8 @@ class Model(object):
         self.rng = np.random.default_rng(seed=0)
 
         # TODO: Add custom initialization for your model here if necessary
+        self.kernel = RBF(length_scale= 1.0)
+        self.model = GaussianProcessRegressor(kernel=self.kernel, random_state=0)
 
     def make_predictions(self, test_x_2D: np.ndarray, test_x_AREA: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -43,8 +45,7 @@ class Model(object):
         """
 
         # TODO: Use your GP to estimate the posterior mean and stddev for each city_area here
-        gp_mean = np.zeros(test_x_2D.shape[0], dtype=float)
-        gp_std = np.zeros(test_x_2D.shape[0], dtype=float)
+        gp_mean, gp_std = self.model.predict(test_x_2D, return_std=True)   
 
         # TODO: Use the GP posterior to form your predictions here
         predictions = gp_mean
@@ -57,24 +58,16 @@ class Model(object):
         :param train_x_2D: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        # Import Training Data
-        X_train = np.loadtxt('train_x.csv', delimiter=',', skiprows=1)[:,:2]
-        y_train = np.loadtxt('train_y.csv', delimiter=',', skiprows=1)
+             
+        # # Create a random subsample from Training Data
+        # subsample_size = 1000
+        # random_indices = np.random.choice(len(train_x_2D), size=subsample_size, replace=False)
+        # train_x_2D_subsample = train_x_2D[random_indices]
+        # train_y_subsample = train_y[random_indices]
 
-        # Create a random subsample from Training Data
-        subsample_size = 1000
-        random_indices = np.random.choice(len(X_train), size=subsample_size, replace=False)
-        X_train_subsample = X_train[random_indices]
-        y_train_subsample = y_train[random_indices]
-
-        # Choose Kernel
-        kernel = RBF(length_scale= 1.0)
-
-        # Fit Model
-        gpr = GaussianProcessRegressor(kernel=kernel, random_state=0)
-        gpr.fit(X_train_subsample,y_train_subsample)
-
-        return gpr
+        # TODO: Fit your model here
+        self.model = self.model.fit(train_x_2D, train_y)
+        return
 
 # You don't have to change this function
 def cost_function(ground_truth: np.ndarray, predictions: np.ndarray, AREA_idxs: np.ndarray) -> float:
