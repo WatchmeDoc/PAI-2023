@@ -58,7 +58,7 @@ class Model(object):
         :param train_x_2D: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-             
+
         # # Create a random subsample from Training Data
         # subsample_size = 1000
         # random_indices = np.random.choice(len(train_x_2D), size=subsample_size, replace=False)
