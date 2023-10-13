@@ -15,6 +15,10 @@ EVALUATION_GRID_POINTS = 300  # Number of grid points used in extended evaluatio
 COST_W_UNDERPREDICT = 50.0
 COST_W_NORMAL = 1.0
 
+CONFIG = {
+    'kernel': 1.0 * RBF(length_scale=1.0),
+    'alpha': 1e-10
+}
 
 class Model(object):
     """
@@ -31,8 +35,7 @@ class Model(object):
         self.rng = np.random.default_rng(seed=0)
 
         # TODO: Add custom initialization for your model here if necessary
-        self.kernel = RBF(length_scale= 1.0)
-        self.model = GaussianProcessRegressor(kernel=self.kernel, random_state=0)
+        self.model = GaussianProcessRegressor(**CONFIG, random_state=0)
 
     def make_predictions(self, test_x_2D: np.ndarray, test_x_AREA: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -45,29 +48,23 @@ class Model(object):
         """
 
         # TODO: Use your GP to estimate the posterior mean and stddev for each city_area here
-        gp_mean, gp_std = self.model.predict(test_x_2D, return_std=True)   
+        gp_mean, gp_std = self.model.predict(test_x_2D, return_std=True)
 
         # TODO: Use the GP posterior to form your predictions here
         predictions = gp_mean
+        # predictions += np.multiply(np.multiply(predictions, test_x_AREA), gp_std)
 
         return predictions, gp_mean, gp_std
 
-    def fitting_model(self, train_y: np.ndarray,train_x_2D: np.ndarray):
+    def fitting_model(self, train_y: np.ndarray, train_x_2D: np.ndarray):
         """
         Fit your model on the given training data.
         :param train_x_2D: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
 
-        # # Create a random subsample from Training Data
-        # subsample_size = 1000
-        # random_indices = np.random.choice(len(train_x_2D), size=subsample_size, replace=False)
-        # train_x_2D_subsample = train_x_2D[random_indices]
-        # train_y_subsample = train_y[random_indices]
-
         # TODO: Fit your model here
         self.model = self.model.fit(train_x_2D, train_y)
-        return
 
 # You don't have to change this function
 def cost_function(ground_truth: np.ndarray, predictions: np.ndarray, AREA_idxs: np.ndarray) -> float:
@@ -186,6 +183,10 @@ def extract_city_area_information(train_x: np.ndarray, test_x: np.ndarray) -> ty
     test_x_AREA = np.zeros((test_x.shape[0],), dtype=bool)
 
     #TODO: Extract the city_area information from the training and test features
+    train_x_2D[:] = np.array(train_x[:, :2])
+    train_x_AREA[:] = np.array(train_x[:, 2])
+    test_x_2D[:] = np.array(test_x[:, :2])
+    test_x_AREA[:] = np.array(test_x[:, 2])
 
     assert train_x_2D.shape[0] == train_x_AREA.shape[0] and test_x_2D.shape[0] == test_x_AREA.shape[0]
     assert train_x_2D.shape[1] == 2 and test_x_2D.shape[1] == 2
