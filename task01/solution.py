@@ -16,8 +16,9 @@ COST_W_UNDERPREDICT = 50.0
 COST_W_NORMAL = 1.0
 
 CONFIG = {
-    'kernel': 1.0 * RBF(length_scale=1.0),
-    'alpha': 1e-10
+    'kernel': 1*RBF(length_scale_bounds=(1e-3,1e-1)) + WhiteKernel(),
+    'alpha': 1e-10,
+    'normalize_y': True
 }
 
 class Model(object):
@@ -62,9 +63,18 @@ class Model(object):
         :param train_x_2D: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
+        # Set the desired subsample size
+        subsample_size = 4000
+
+        # Create a random subsample
+        np.random.seed(42)
+        random_indices = np.random.choice(train_x_2D.shape[0], subsample_size, replace=False)
+        train_x_2D_subsample = train_x_2D[random_indices]
+        train_y_subsample = train_y[random_indices]
 
         # TODO: Fit your model here
-        self.model = self.model.fit(train_x_2D, train_y)
+        self.model = self.model.fit(train_x_2D_subsample, train_y_subsample)
+        print('Optimized Kernel: ', self.model.kernel_)
 
 # You don't have to change this function
 def cost_function(ground_truth: np.ndarray, predictions: np.ndarray, AREA_idxs: np.ndarray) -> float:
