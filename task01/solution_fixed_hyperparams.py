@@ -73,10 +73,6 @@ class Model(object):
         predictions[mask] +=  self.lamda * gp_sigmas[mask]
 
         return predictions, gp_means, gp_sigmas
-    
-    def get_mean_variance(self, test_x_2D: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:  
-        gp_means, gp_sigmas = self.model.predict(test_x_2D, return_std=True)
-        return gp_means, gp_sigmas
 
     def fitting_model(self, train_y: np.ndarray, train_x_2D: np.ndarray, fit_lamda: bool = True):
         """
@@ -91,7 +87,7 @@ class Model(object):
         self.model = self.model.fit(train_x, train_y)
         
         if fit_lamda:
-            means, sigmas = self.get_mean_variance(train_x)
+            means, sigmas = self.model.predict(train_x, return_std=True)
             self.lamda = minimize(lambda_cost_function, x0=1, args=(means, sigmas, train_y)).x[0]
         
         return
