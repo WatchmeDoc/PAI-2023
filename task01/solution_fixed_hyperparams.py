@@ -4,12 +4,10 @@ from sklearn.gaussian_process.kernels import *
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import Normalizer
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 from matplotlib import cm
-
-DEBUG = True
 
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
 EXTENDED_EVALUATION = False
@@ -20,17 +18,13 @@ COST_W_UNDERPREDICT = 50.0
 COST_W_NORMAL = 1.0
 
 MODEL_CONFIG = {
-    
-    # 'kernel': 
-    #     ConstantKernel(constant_value=0.5, constant_value_bounds=[1e-2, 1e2]) 
-    #     * RBF(length_scale=0.02, length_scale_bounds=[1e-3, 1e-1]) 
-    #     + WhiteKernel(noise_level=0.01, noise_level_bounds=(1e-3, 1e-1)),
-    
-    'kernel': 
-        ConstantKernel(constant_value=0.789**2, constant_value_bounds='fixed') 
-        * RBF(length_scale=0.0226, length_scale_bounds='fixed') 
-        + WhiteKernel(noise_level=0.0104, noise_level_bounds='fixed'),
         
+    # kernel hyperparameters derived from 100% of data
+    'kernel': 
+        ConstantKernel(constant_value=1.078650707257617, constant_value_bounds='fixed') 
+        * Matern(length_scale=0.20164570436472332, length_scale_bounds='fixed', nu=1.5) 
+        + WhiteKernel(noise_level=0.005346546582467515, noise_level_bounds='fixed'),  
+
     'alpha': 1e-10,
     'normalize_y': True,
     'n_restarts_optimizer': 0
@@ -39,26 +33,25 @@ MODEL_CONFIG = {
 class Model(object):
     """
     Model for this task.
-    You need to implement the fitting_model and make_prediction methods
+    You need to implement the fitting_model and make_predictions methods
     without changing their signatures, but are allowed to create additional methods.
     """
 
-    def __init__(self, normalize_x=False):
+    def __init__(self, normalize_x=True):
         """
         Initialize your model here.
         We already provide a random number generator for reproducibility.
         """
         self.rng = np.random.default_rng(seed=0)
-
-        # TODO: Add custom initialization for your model here if necessary
+        random_seed = self.rng.integers(low=0, high=2**32 - 1)
 
         if normalize_x:
-            self.normalizer = Normalizer()
+            self.transformer = StandardScaler()
         else:
-            self.normalizer = None
+            self.transformer = FunctionTransformer(func=None, inverse_func=None, validate=True)
         
         self.lamda = 0
-        self.model = GaussianProcessRegressor(**MODEL_CONFIG)
+        self.model = GaussianProcessRegressor(**MODEL_CONFIG, random_state=random_seed)
 
     def make_predictions(self, test_x_2D: np.ndarray, test_x_AREA: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -69,17 +62,10 @@ class Model(object):
             Tuple of three 1d NumPy float arrays, each of shape (NUM_SAMPLES,),
             containing your predictions, the GP posterior mean, and the GP posterior stddev (in that order)
         """
-
-        # TODO: Use your GP to estimate the posterior mean and stddev for each city_area here
         
-        if self.normalizer:
-            test_x = self.normalizer.transform(test_x_2D)
-        else:
-            test_x = test_x_2D
+        test_x = self.transformer.transform(test_x_2D)
 
         gp_means, gp_sigmas = self.model.predict(test_x, return_std=True)
-
-        # TODO: Use the GP posterior to form your predictions here
         predictions = gp_means
         
         # Adjust predictions for residential areas
@@ -88,30 +74,26 @@ class Model(object):
 
         return predictions, gp_means, gp_sigmas
     
-    def get_mean_variance(self, test_x_2D: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]: 
+    def get_mean_variance(self, test_x_2D: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:  
         gp_means, gp_sigmas = self.model.predict(test_x_2D, return_std=True)
         return gp_means, gp_sigmas
 
-    def fitting_model(self, train_y: np.ndarray, train_x_2D: np.ndarray):
+    def fitting_model(self, train_y: np.ndarray, train_x_2D: np.ndarray, fit_lamda: bool = True):
         """
         Fit your model on the given training data.
         :param train_x_2D: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
 
-        # TODO: Fit your model here
-        
-        if self.normalizer:
-            train_x = self.normalizer.transform(train_x_2D)
-        else:
-            train_x = train_x_2D
+        self.transformer = self.transformer.fit(train_x_2D)
+        train_x = self.transformer.transform(train_x_2D)
 
         self.model = self.model.fit(train_x, train_y)
-        print('Optimized Kernel: ', self.model.kernel_)
         
-        # Find optimal lamda
-        means, sigmas = self.get_mean_variance(train_x_2D)
-        self.lamda = minimize(lambda_cost_function, x0=1, args=(means, sigmas, train_y)).x[0]
+        if fit_lamda:
+            means, sigmas = self.get_mean_variance(train_x)
+            self.lamda = minimize(lambda_cost_function, x0=1, args=(means, sigmas, train_y)).x[0]
+        
         return
 
 # You don't have to change this function
