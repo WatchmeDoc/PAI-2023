@@ -3,11 +3,9 @@ import typing
 from sklearn.gaussian_process.kernels import *
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from scipy.optimize import minimize
 import matplotlib.pyplot as plt
-from matplotlib import cm
 
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
 EXTENDED_EVALUATION = False
@@ -21,9 +19,9 @@ MODEL_CONFIG = {
 
     # kernel hyperparameters derived from 100% of data
     'kernel':
-        ConstantKernel(constant_value=1.078650707257617, constant_value_bounds='fixed')
-        * Matern(length_scale=0.20164570436472332, length_scale_bounds='fixed', nu=1.5)
-        + WhiteKernel(noise_level=0.005346546582467515, noise_level_bounds='fixed'),
+        ConstantKernel(constant_value=1.0347682221487602, constant_value_bounds='fixed')
+        * Matern(length_scale=0.19477170652781176, length_scale_bounds='fixed', nu=1.5)
+        + WhiteKernel(noise_level=0.005428582102921252, noise_level_bounds='fixed'),
 
     'alpha': 1e-10,
     'normalize_y': True,
