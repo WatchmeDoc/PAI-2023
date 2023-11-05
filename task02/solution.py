@@ -25,7 +25,7 @@ EXTENDED_EVALUATION = False
 Set `EXTENDED_EVALUATION` to `True` in order to generate additional plots on validation data.
 """
 
-USE_PRETRAINED_INIT = True
+USE_PRETRAINED_INIT = False
 """
 If `USE_PRETRAINED_INIT` is `True`, then MAP inference uses provided pretrained weights.
 You should not modify MAP training or the CNN architecture before passing the hard baseline.
@@ -648,7 +648,11 @@ class SWAGScheduler(torch.optim.lr_scheduler.LRScheduler):
         This method should return a single float: the new learning rate.
         """
         # TODO(2): Implement a custom schedule if desired
-        return old_lr
+        # Implementation of cyclical learning rate schedule
+        # Current epoch = step_number / steps_per_epoch
+        # Therefore when the result is an integer we made a full cycle
+        t_i = current_epoch - np.floor(current_epoch)
+        return (1 - t_i) * self._a1 + t_i * self._a2
 
     # TODO(2): Add and store additional arguments if you decide to implement a custom scheduler
     def __init__(
@@ -659,6 +663,10 @@ class SWAGScheduler(torch.optim.lr_scheduler.LRScheduler):
     ):
         self.epochs = epochs
         self.steps_per_epoch = steps_per_epoch
+        # hyperparams for cyclical lr schedule
+        lower_bound = 0.1
+        self._a1 = [group['lr'] for group in optimizer.param_groups][0]
+        self._a2 = [group['lr'] * lower_bound for group in optimizer.param_groups][0]
         super().__init__(optimizer, last_epoch=-1, verbose=False)
 
     def get_lr(self):
