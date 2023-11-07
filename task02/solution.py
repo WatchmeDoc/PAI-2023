@@ -206,6 +206,7 @@ class SWAGInference(object):
             optimizer,
             epochs=self.swag_epochs,
             steps_per_epoch=len(loader),
+            c=self.swag_update_freq,
         )
 
         # TODO(1): Perform initialization for SWAG fitting
@@ -588,11 +589,13 @@ class SWAGScheduler(torch.optim.lr_scheduler.LRScheduler):
         optimizer: torch.optim.Optimizer,
         epochs: int,
         steps_per_epoch: int,
+        c: int = 1
     ):
         self.epochs = epochs
         self.steps_per_epoch = steps_per_epoch
         # hyperparams for cyclical lr schedule
         lower_bound = 0.1
+        self._c = c
         self._a1 = [group['lr'] for group in optimizer.param_groups][0]
         self._a2 = [group['lr'] * lower_bound for group in optimizer.param_groups][0]
         super().__init__(optimizer, last_epoch=-1, verbose=False)
@@ -603,7 +606,7 @@ class SWAGScheduler(torch.optim.lr_scheduler.LRScheduler):
                 "To get the last learning rate computed by the scheduler, please use `get_last_lr()`.", UserWarning
             )
         return [
-            self.calculate_lr(self.last_epoch / self.steps_per_epoch, group["lr"])
+            self.calculate_lr(self.last_epoch / (self._c * self.steps_per_epoch), group["lr"])
             for group in self.optimizer.param_groups
         ]
 
