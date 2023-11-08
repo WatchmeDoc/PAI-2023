@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 
 from util import draw_reliability_diagram, cost_function, setup_seeds, calc_calibration_curve
 
-EXTENDED_EVALUATION = True
+EXTENDED_EVALUATION = False
 """
 Set `EXTENDED_EVALUATION` to `True` in order to generate additional plots on validation data.
 """
@@ -113,7 +113,7 @@ class SWAGInference(object):
         model_dir: pathlib.Path,
         # TODO(1): change inference_mode to InferenceMode.SWAG_DIAGONAL
         # TODO(2): change inference_mode to InferenceMode.SWAG_FULL
-        inference_mode: InferenceMode = InferenceMode.SWAG_DIAGONAL,
+        inference_mode: InferenceMode = InferenceMode.SWAG_FULL,
         # TODO(2): optionally add/tweak hyperparameters
         swag_epochs: int = 30,
         swag_learning_rate: float = 0.045,
@@ -160,6 +160,13 @@ class SWAGInference(object):
         # Full SWAG
         # TODO(2): create attributes for SWAG-diagonal
         #  Hint: check collections.deque
+        
+        # Option 1: Add all the weights as a dictionary (name -> weight) to the deque
+        #self.weights_deviation = collections.deque(maxlen=self.deviation_matrix_max_rank)
+        
+        # Option 2: Create a dictionary of deques (name -> deque of weights)
+        self.weights_deviation = {name: collections.deque(maxlen=self.deviation_matrix_max_rank) for name, _ in self.network.named_parameters()}
+        
 
         # Calibration, prediction, and other attributes
         # TODO(2): create additional attributes, e.g., for calibration
@@ -173,19 +180,21 @@ class SWAGInference(object):
         # Create a copy of the current network weights
         current_params = {name: param.detach() for name, param in self.network.named_parameters()}
 
-        # SWAG-diagonal
         for name, param in current_params.items():
+            # SWAG-diagonal
             # TODO(1): update SWAG-diagonal attributes for weight `name` using `current_params` and `param`
             self.weights_first_moment[name] = ( self.weights_num * self.weights_first_moment[name] + param ) / ( self.weights_num + 1 )
             self.weights_second_moment[name] = ( self.weights_num * self.weights_second_moment[name] + param**2 ) / ( self.weights_num + 1 )
+            
+            # Full SWAG
+            if self.inference_mode == InferenceMode.SWAG_FULL:
+                # TODO(2): update full SWAG attributes for weight `name` using `current_params` and `param`
+                self.weights_deviation[name].append(param - self.weights_first_moment[name])
         
         self.weights_num += 1
         
 
-        # Full SWAG
-        if self.inference_mode == InferenceMode.SWAG_FULL:
-            # TODO(2): update full SWAG attributes for weight `name` using `current_params` and `param`
-            raise NotImplementedError("Update full SWAG statistics")
+
 
     def fit_swag(self, loader: torch.utils.data.DataLoader) -> None:
         """
@@ -216,9 +225,9 @@ class SWAGInference(object):
         )
 
         # TODO(1): Perform initialization for SWAG fitting
-        self.weights_first_moment = self._create_weight_copy()
-        self.weights_second_moment = self._create_weight_copy()
-        self.weights_num = 0
+        self.weights_first_moment = {name: param.detach() for name, param in self.network.named_parameters()}
+        self.weights_second_moment = {name: param.detach()**2 for name, param in self.network.named_parameters()}
+        self.weights_num = 1
 
         self.network.train()
         with tqdm.trange(self.swag_epochs, desc="Running gradient descent for SWA") as pbar:
@@ -337,8 +346,12 @@ class SWAGInference(object):
             # Full SWAG part
             if self.inference_mode == InferenceMode.SWAG_FULL:
                 # TODO(2): Sample parameter values for full SWAG
-                raise NotImplementedError("Sample parameter for full SWAG")
-                sampled_param += ...
+                kappa = len(self.self.weights_deviation[name])
+                z_2 = torch.randn(kappa)
+                D_mat = np.concatenate(self.weights_deviation[name], axis=-1)
+
+                deviance_term = 1/np.sqrt(2*(kappa-1)) * D_mat @ z_2
+                sampled_param += (1/np.sqrt(2)-1) * current_std * z_1 + deviance_term
 
             # Modify weight value in-place; directly changing self.network
             param.data = sampled_param
