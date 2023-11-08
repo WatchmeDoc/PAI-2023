@@ -156,15 +156,10 @@ class SWAGInference(object):
         self.weights_first_moment = self._create_weight_copy()
         self.weights_second_moment = self._create_weight_copy()
         self.weights_num = 0
-
+        
         # Full SWAG
         # TODO(2): create attributes for SWAG-diagonal
         #  Hint: check collections.deque
-        
-        # Option 1: Add all the weights as a dictionary (name -> weight) to the deque
-        #self.weights_deviation = collections.deque(maxlen=self.deviation_matrix_max_rank)
-        
-        # Option 2: Create a dictionary of deques (name -> deque of weights)
         self.weights_deviation = {name: collections.deque(maxlen=self.deviation_matrix_max_rank) for name, _ in self.network.named_parameters()}
         
 
@@ -178,13 +173,14 @@ class SWAGInference(object):
         """
 
         # Create a copy of the current network weights
-        current_params = {name: param.detach() for name, param in self.network.named_parameters()}
+        current_params = {name: param.detach().clone() for name, param in self.network.named_parameters()}
 
         for name, param in current_params.items():
             # SWAG-diagonal
             # TODO(1): update SWAG-diagonal attributes for weight `name` using `current_params` and `param`
-            self.weights_first_moment[name] = ( self.weights_num * self.weights_first_moment[name] + param ) / ( self.weights_num + 1 )
-            self.weights_second_moment[name] = ( self.weights_num * self.weights_second_moment[name] + param**2 ) / ( self.weights_num + 1 )
+            # From Welford's online algorithm https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
+            self.weights_first_moment[name] += ( param - self.weights_first_moment[name]) / ( self.weights_num + 1 )
+            self.weights_second_moment[name] += ( param**2 - self.weights_second_moment[name]) / ( self.weights_num + 1 )
             
             # Full SWAG
             if self.inference_mode == InferenceMode.SWAG_FULL:
@@ -225,8 +221,8 @@ class SWAGInference(object):
         )
 
         # TODO(1): Perform initialization for SWAG fitting
-        self.weights_first_moment = {name: param.detach() for name, param in self.network.named_parameters()}
-        self.weights_second_moment = {name: param.detach()**2 for name, param in self.network.named_parameters()}
+        self.weights_first_moment = {name: param.detach().clone() for name, param in self.network.named_parameters()}
+        self.weights_second_moment = {name: param.detach().clone()**2 for name, param in self.network.named_parameters()}
         self.weights_num = 1
 
         self.network.train()
@@ -335,9 +331,11 @@ class SWAGInference(object):
         for name, param in self.network.named_parameters():
             # SWAG-diagonal part
             z_1 = torch.randn(param.size())
+            
             # TODO(1): Sample parameter values for SWAG-diagonal
             current_mean = self.weights_first_moment[name]
             current_std = torch.sqrt(self.weights_second_moment[name] - self.weights_first_moment[name]**2)
+            
             assert current_mean.size() == param.size() and current_std.size() == param.size()
 
             # Diagonal part
@@ -348,10 +346,12 @@ class SWAGInference(object):
                 # TODO(2): Sample parameter values for full SWAG
                 kappa = len(self.weights_deviation[name])
                 z_2 = torch.randn(kappa)
-                D_mat = torch.from_numpy(np.stack(self.weights_deviation[name], axis=-1))
-
-                deviance_term = 1/np.sqrt(2*(kappa-1)) * torch.matmul(D_mat, z_2)
-                sampled_param += (1/np.sqrt(2)-1) * current_std * z_1 + deviance_term
+                
+                deviation_matrix = torch.stack(list(self.weights_deviation[name]), axis=-1)
+                deviance_factor = 1/np.sqrt(2*(kappa-1)) * deviation_matrix
+                
+                sampled_param += torch.matmul(deviance_factor,z_2)
+                sampled_param += (1/np.sqrt(2)-1) * current_std * z_1
 
             # Modify weight value in-place; directly changing self.network
             param.data = sampled_param
