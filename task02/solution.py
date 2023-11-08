@@ -346,11 +346,11 @@ class SWAGInference(object):
             # Full SWAG part
             if self.inference_mode == InferenceMode.SWAG_FULL:
                 # TODO(2): Sample parameter values for full SWAG
-                kappa = len(self.self.weights_deviation[name])
+                kappa = len(self.weights_deviation[name])
                 z_2 = torch.randn(kappa)
-                D_mat = np.concatenate(self.weights_deviation[name], axis=-1)
+                D_mat = torch.from_numpy(np.stack(self.weights_deviation[name], axis=-1))
 
-                deviance_term = 1/np.sqrt(2*(kappa-1)) * D_mat @ z_2
+                deviance_term = 1/np.sqrt(2*(kappa-1)) * torch.matmul(D_mat, z_2)
                 sampled_param += (1/np.sqrt(2)-1) * current_std * z_1 + deviance_term
 
             # Modify weight value in-place; directly changing self.network
