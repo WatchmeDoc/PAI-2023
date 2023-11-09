@@ -25,7 +25,7 @@ EXTENDED_EVALUATION = False
 Set `EXTENDED_EVALUATION` to `True` in order to generate additional plots on validation data.
 """
 
-USE_PRETRAINED_INIT = False
+USE_PRETRAINED_INIT = True
 """
 If `USE_PRETRAINED_INIT` is `True`, then MAP inference uses provided pretrained weights.
 You should not modify MAP training or the CNN architecture before passing the hard baseline.
