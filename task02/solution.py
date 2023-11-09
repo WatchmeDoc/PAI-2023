@@ -131,7 +131,8 @@ class SWAGInference(object):
         deviation_matrix_max_rank: int = 15,
         bma_samples: int = 30,
         lower_bound: float = 0.1,
-        burn_period: int = 0
+        burn_period: int = 0,
+        temperature: float = 1.0,
     ):
         """
         :param train_xs: Training images (for storage only)
@@ -184,6 +185,7 @@ class SWAGInference(object):
         )
         self.burn_period = burn_period
         self.lower_bound = lower_bound
+        self.temperature = temperature
 
     def update_swag(self) -> None:
         """
@@ -588,6 +590,7 @@ class SWAGInference(object):
             predictions.append(self.network(batch_xs))
 
         predictions = torch.cat(predictions)
+        predictions /= self.temperature
         return torch.softmax(predictions, dim=-1)
 
     def _update_batchnorm(self) -> None:
