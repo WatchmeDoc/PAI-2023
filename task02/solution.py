@@ -130,6 +130,8 @@ class SWAGInference(object):
         swag_update_freq: int = 1,
         deviation_matrix_max_rank: int = 15,
         bma_samples: int = 30,
+        lower_bound: float = 0.1,
+        burn_period: int = 0
     ):
         """
         :param train_xs: Training images (for storage only)
@@ -180,6 +182,8 @@ class SWAGInference(object):
         self._prediction_threshold = (
             None  # this is an example, feel free to be creative
         )
+        self.burn_period = burn_period
+        self.lower_bound = lower_bound
 
     def update_swag(self) -> None:
         """
@@ -239,6 +243,7 @@ class SWAGInference(object):
             epochs=self.swag_epochs,
             steps_per_epoch=len(loader),
             c=self.swag_update_freq,
+            lower_bound=self.lower_bound
         )
 
         # TODO(1): Perform initialization for SWAG fitting
@@ -285,7 +290,7 @@ class SWAGInference(object):
                     pbar.set_postfix(pbar_dict)
 
                 # TODO(1): Implement periodic SWAG updates using the attributes defined in __init__
-                if epoch % self.swag_update_freq == 0:
+                if epoch % self.swag_update_freq == 0 and epoch > self.burn_period:
                     self.update_swag()
 
     def calibrate(self, validation_data: torch.utils.data.Dataset) -> None:
@@ -661,15 +666,16 @@ class SWAGScheduler(torch.optim.lr_scheduler.LRScheduler):
         optimizer: torch.optim.Optimizer,
         epochs: int,
         steps_per_epoch: int,
-        c: int = 1
+        c: int,
+        lower_bound: float
     ):
         self.epochs = epochs
         self.steps_per_epoch = steps_per_epoch
         # hyperparams for cyclical lr schedule
-        lower_bound = 0.1
+        self._lower_bound = lower_bound
         self._c = c
         self._a1 = [group['lr'] for group in optimizer.param_groups][0]
-        self._a2 = [group['lr'] * lower_bound for group in optimizer.param_groups][0]
+        self._a2 = [group['lr'] * self._lower_bound for group in optimizer.param_groups][0]
         super().__init__(optimizer, last_epoch=-1, verbose=False)
 
     def get_lr(self):
