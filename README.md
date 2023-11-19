@@ -49,6 +49,6 @@ $ docker build --tag task0 .; docker run --rm -v "$(pwd):/results" task0
 ```
 
 #### Team Members:
-* Aristotelis Koutris, [akoutris@ethz.ch](mailto:akoutris@ethz.ch)
-* Aylin Akkus,  [aakkus@ethz.ch](mailto:aakkus@ethz.ch)
-* George Manos, [gmanos@ethz.ch](mailto:gmanos@ethz.ch)
+* Aristotelis Koutris, [akoutris@ethz.ch](mailto:akoutris@ethz.ch) (All Tasks)
+* George Manos, [gmanos@ethz.ch](mailto:gmanos@ethz.ch) (All Tasks)
+* Aylin Akkus,  [aakkus@ethz.ch](mailto:aakkus@ethz.ch) (Task 0, 1 and 2)
