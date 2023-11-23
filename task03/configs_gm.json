@@ -1,31 +1,89 @@
 [
   {
-    "F_GPR_PARAMS" : {
-          "kernel": "Matern(1, length_scale_bounds='fixed', nu=2.5)",
-          "alpha": 0.15,
-          "optimizer": "fmin_l_bfgs_b",
-          "n_restarts_optimizer": 0,
-          "normalize_y": false,
-          "copy_X_train": true,
-          "n_targets": null,
-          "random_state": null
+    "F_GPR_PARAMS": {
+      "kernel": "Matern(1, length_scale_bounds='fixed', nu=2.5)",
+      "alpha": 0.15,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": false,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
     },
-    "V_GPR_PARAMS" : {
-          "kernel": "D(sigma_0=2) + Matern(1, length_scale_bounds='fixed', nu=2.5)",
-          "alpha": 0.0001,
-          "optimizer": "fmin_l_bfgs_b",
-          "n_restarts_optimizer": 0,
-          "normalize_y": false,
-          "copy_X_train": true,
-          "n_targets": null,
-          "random_state": null
+    "V_GPR_PARAMS": {
+      "kernel": "D(sigma_0=2) + Matern(1, length_scale_bounds='fixed', nu=2.5)",
+      "alpha": 0.0001,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": false,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
     },
-    "self.l" : 1,
-    "self.v_coeff" : 0,
-    "OPT_RESTARTS" : 20,
-    "SAFETY_THRESHOLD" : 4,
+    "self.l": 1,
+    "self.v_coeff": 0,
+    "OPT_RESTARTS": 20,
+    "SAFETY_THRESHOLD": 4,
     "results": {
-          "average_score" : 0.684890
+      "average_score": 0.684890
+    }
+  },
+  {
+    "F_GPR_PARAMS": {
+      "kernel": "Matern(1, nu=2.5)",
+      "alpha": 0.15,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": false,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
+    },
+    "V_GPR_PARAMS": {
+      "kernel": "D(sigma_0=2) + Matern(1, nu=2.5)",
+      "alpha": 0.0001,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": false,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
+    },
+    "self.l": 0.1,
+    "self.v_coeff": 0,
+    "OPT_RESTARTS": 20,
+    "SAFETY_THRESHOLD": 4,
+    "results": {
+      "average_score": 0.64131
+    }
+  },
+  {
+    "F_GPR_PARAMS": {
+      "kernel": "Matern(1, nu=2.5)",
+      "alpha": 0.15,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": true,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
+    },
+    "V_GPR_PARAMS": {
+      "kernel": "D(sigma_0=2) + Matern(1, nu=2.5)",
+      "alpha": 0.0001,
+      "optimizer": "fmin_l_bfgs_b",
+      "n_restarts_optimizer": 0,
+      "normalize_y": true,
+      "copy_X_train": true,
+      "n_targets": null,
+      "random_state": null
+    },
+    "self.l": 0.1,
+    "self.v_coeff": 0,
+    "OPT_RESTARTS": 20,
+    "SAFETY_THRESHOLD": 4,
+    "results": {
+      "average_score": 0.64131
     }
   }
 ]
