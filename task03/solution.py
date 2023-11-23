@@ -4,21 +4,22 @@ from scipy.optimize import fmin_l_bfgs_b
 # import additional ...
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
-from sklearn.gaussian_process.kernels import ConstantKernel as C
 from sklearn.gaussian_process.kernels import DotProduct as D
 from sklearn.gaussian_process.kernels import Matern
+from sklearn.gaussian_process.kernels import WhiteKernel
 import matplotlib.pyplot as plt
 
 # global variables
 DOMAIN = np.array([[0, 10]])  # restrict \theta in [0, 10]
 SAFETY_THRESHOLD = 4  # threshold, upper bound of SA
+PRIOR_MEAN = 4  # prior mean of v
 OPT_RESTARTS = 20  # number of restarts for the optimization
 
 F_GPR_PARAMS = {
-    "kernel": Matern(1, length_scale_bounds="fixed", nu=2.5),
-    "alpha": 0.15,
+    "kernel": 0.5 * Matern(1, nu=2.5) + WhiteKernel(noise_level=0.15**2),
+    "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
-    "n_restarts_optimizer": 0,
+    "n_restarts_optimizer": 5,
     "normalize_y": False,
     "copy_X_train": True,
     "n_targets": None,
@@ -26,10 +27,10 @@ F_GPR_PARAMS = {
 }
 
 V_GPR_PARAMS = {
-    "kernel": D(sigma_0=2) + Matern(1, length_scale_bounds="fixed", nu=2.5),
-    "alpha": 0.0001,
+    "kernel": D(sigma_0=2) + np.sqrt(2) * RBF(1.0) + WhiteKernel(noise_level=0.0001**2),
+    "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
-    "n_restarts_optimizer": 0,
+    "n_restarts_optimizer": 5,
     "normalize_y": False,
     "copy_X_train": True,
     "n_targets": None,
@@ -45,8 +46,8 @@ class BO_algo:
         # TODO: Define all relevant class members for your BO algorithm here.
         self.f = GaussianProcessRegressor(**F_GPR_PARAMS)
         self.v = GaussianProcessRegressor(**V_GPR_PARAMS)
-        self.l = 1
-        self.v_coeff = 0
+        self.l = 0.1
+        self.v_coeff = 1.96
 
         self.f_data = []
         self.v_data = []
@@ -119,7 +120,7 @@ class BO_algo:
         y_mean, y_std = self.f.predict(x, return_std=True)
         v_mean, v_std = self.v.predict(x, return_std=True)
         f = y_mean + 1.96 * y_std  # 95% confidence interval
-        v = v_mean + self.v_coeff * v_std  # 95% confidence interval
+        v = v_mean + self.v_coeff * v_std
         self.debug.append((v_mean, v_std))
         return f - self.l * max(v, 0)
 
@@ -139,7 +140,7 @@ class BO_algo:
         # TODO: Add the observed data {x, f, v} to your model.
 
         self.f_data.append(f)
-        self.v_data.append(v)
+        self.v_data.append(v - PRIOR_MEAN)
         self.x_data.append(x)
         self.f.fit(np.stack(self.x_data), np.array(self.f_data))
         self.v.fit(np.stack(self.x_data), np.array(self.v_data))
@@ -157,11 +158,10 @@ class BO_algo:
         x_max = None
         f_max = -np.inf
         for i in range(len(self.x_data)):
-            if self.v_data[i] < SAFETY_THRESHOLD and self.f_data[i] > f_max:
+            if self.v_data[i] + PRIOR_MEAN < SAFETY_THRESHOLD and self.f_data[i] > f_max:
                 x_max = self.x_data[i]
+                f_max = self.f_data[i]
         return x_max
-
-
 
     def plot(self, plot_recommendation: bool = True):
         """Plot objective and constraint posterior for debugging (OPTIONAL).
@@ -251,7 +251,6 @@ def main():
         x = agent.next_recommendation()
 
         # Check for valid shape
-
 
         # Obtain objective and constraint observation
         obj_val = f(x) + np.random.randn()
