@@ -7,16 +7,18 @@ from sklearn.gaussian_process.kernels import RBF
 from sklearn.gaussian_process.kernels import DotProduct as D
 from sklearn.gaussian_process.kernels import Matern
 from sklearn.gaussian_process.kernels import WhiteKernel
+from sklearn.gaussian_process.kernels import ConstantKernel as C
 import matplotlib.pyplot as plt
 
 # global variables
-DOMAIN = np.array([[0, 10]])  # restrict \theta in [0, 10]
+DOMAIN = np.array([[0, 10]])  # restrict theta in [0, 10]
 SAFETY_THRESHOLD = 4  # threshold, upper bound of SA
 PRIOR_MEAN = 4  # prior mean of v
-OPT_RESTARTS = 20  # number of restarts for the optimization
+OPT_RESTARTS = 40  # number of restarts for the optimization
+SHOW_PLOTS = False
 
 F_GPR_PARAMS = {
-    "kernel": 0.5 * Matern(1, nu=2.5) + WhiteKernel(noise_level=0.15**2),
+    "kernel": C(0.5, constant_value_bounds='fixed') * Matern(nu=2.5, length_scale=1.0, length_scale_bounds=[0.2,20]) + WhiteKernel(noise_level=0.15**2),
     "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
     "n_restarts_optimizer": 5,
@@ -27,7 +29,7 @@ F_GPR_PARAMS = {
 }
 
 V_GPR_PARAMS = {
-    "kernel": D(sigma_0=2) + np.sqrt(2) * RBF(1.0) + WhiteKernel(noise_level=0.0001**2),
+    "kernel": C(1, constant_value_bounds=[0.5,1.5]) * D(sigma_0=0, sigma_0_bounds='fixed') + C(np.sqrt(2), constant_value_bounds='fixed') * RBF(length_scale=1.0, length_scale_bounds=[0.2,20]) + WhiteKernel(noise_level=0.0001**2),
     "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
     "n_restarts_optimizer": 5,
@@ -46,14 +48,17 @@ class BO_algo:
         # TODO: Define all relevant class members for your BO algorithm here.
         self.f = GaussianProcessRegressor(**F_GPR_PARAMS)
         self.v = GaussianProcessRegressor(**V_GPR_PARAMS)
-        self.l = 0.1
-        self.v_coeff = 1.96
+        
+        self.l = 1
+        self.f_coeff = 2
+        self.v_coeff = 2
 
-        self.f_data = []
-        self.v_data = []
-        self.x_data = []
+        self.f_data = np.array([])
+        self.v_data = np.array([])
+        self.x_data = np.array([]).reshape(-1,1)
 
-        self.debug = []
+        self.random_step_clock = 1
+        self.random_step_period = np.inf
 
     def next_recommendation(self):
         """
@@ -68,8 +73,14 @@ class BO_algo:
         # using functions f and v.
         # In implementing this function, you may use
         # optimize_acquisition_function() defined below.
-
-        return np.array([self.optimize_acquisition_function()])
+        
+        if self.random_step_clock == self.random_step_period:
+            self.random_step_clock = 1
+            return np.random.uniform(*DOMAIN[0])
+        
+        self.random_step_clock += 1
+        
+        return self.optimize_acquisition_function()
 
     def optimize_acquisition_function(self):
         """Optimizes the acquisition function defined below (DO NOT MODIFY).
@@ -87,7 +98,7 @@ class BO_algo:
         f_values = []
         x_values = []
 
-        # Restarts the optimization 20 times and pick best solution
+        # Restarts the optimization OPT_RESTARTS times and pick best solution
         for _ in range(OPT_RESTARTS):
             x0 = DOMAIN[:, 0] + (DOMAIN[:, 1] - DOMAIN[:, 0]) * np.random.rand(
                 DOMAIN.shape[0]
@@ -116,13 +127,16 @@ class BO_algo:
             Value of the acquisition function at x
         """
         x = np.atleast_2d(x)
+        
         # TODO: Implement the acquisition function you want to optimize.
+        
         y_mean, y_std = self.f.predict(x, return_std=True)
         v_mean, v_std = self.v.predict(x, return_std=True)
-        f = y_mean + 1.96 * y_std  # 95% confidence interval
-        v = v_mean + self.v_coeff * v_std
-        self.debug.append((v_mean, v_std))
-        return f - self.l * max(v, 0)
+        
+        f = y_mean + self.f_coeff * y_std
+        v = (v_mean + PRIOR_MEAN) + self.v_coeff * v_std
+        
+        return f - self.l * np.exp(v - SAFETY_THRESHOLD)
 
     def add_data_point(self, x: float, f: float, v: float):
         """
@@ -138,13 +152,14 @@ class BO_algo:
             SA constraint func
         """
         # TODO: Add the observed data {x, f, v} to your model.
-
-        self.f_data.append(f)
-        self.v_data.append(v - PRIOR_MEAN)
-        self.x_data.append(x)
-        self.f.fit(np.stack(self.x_data), np.array(self.f_data))
-        self.v.fit(np.stack(self.x_data), np.array(self.v_data))
-
+        
+        self.f_data = np.append(self.f_data, f)
+        self.v_data = np.append(self.v_data, v)
+        self.x_data = np.vstack([self.x_data, [x]])
+            
+        self.f.fit(self.x_data, self.f_data)
+        self.v.fit(self.x_data, self.v_data - PRIOR_MEAN)
+        
     def get_solution(self):
         """
         Return x_opt that is believed to be the maximizer of f.
@@ -155,12 +170,11 @@ class BO_algo:
             the optimal solution of the problem
         """
         # TODO: Return your predicted safe optimum of f.
-        x_max = None
-        f_max = -np.inf
-        for i in range(len(self.x_data)):
-            if self.v_data[i] + PRIOR_MEAN < SAFETY_THRESHOLD and self.f_data[i] > f_max:
-                x_max = self.x_data[i]
-                f_max = self.f_data[i]
+        v_mask = self.v_data < SAFETY_THRESHOLD
+        fs = self.f_data[v_mask]
+        xs = self.x_data[v_mask]
+        best_ind = np.argmax(fs)
+        x_max = xs[best_ind]
         return x_max
 
     def plot(self, plot_recommendation: bool = True):
@@ -171,33 +185,52 @@ class BO_algo:
         plot_recommendation: bool
             Plots the recommended point if True.
         """
-        x = np.linspace(*DOMAIN[0], 1000)
-        plt.figure()
-        plt.title("f(x) and v(x)")
+        x = np.linspace(*DOMAIN[0], 1000).reshape(-1, 1)
+
+        # Create subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+
+        # Plot for f
+        f_true = np.vectorize(f)(x)
+        ax1.plot(x, f_true, label="f(x) true", linestyle="--", color="orange")
         f_mean, f_std = self.f.predict(x, return_std=True)
-        plt.plot(x, f_mean, label="f(x)")
-        plt.fill_between(
-            x,
+        ax1.plot(x, f_mean, label="f(x) surrogate", color="blue")
+        ax1.fill_between(
+            x[:, 0],
             f_mean - 1.96 * f_std,
             f_mean + 1.96 * f_std,
             alpha=0.2,
-            label="95% confidence interval",
+            color="blue",
+            label="95% confidence interval"
         )
+        ax1.set_title("Function f(x)")
+        ax1.legend()
+
+        # Plot for v
+        v_true = np.vectorize(v)(x)
+        ax2.plot(x, v_true, label="v(x) true", linestyle="--", color="orange")
         v_mean, v_std = self.v.predict(x, return_std=True)
-        plt.plot(x, v_mean, label="v(x)")
-        plt.fill_between(
-            x,
+        v_mean += PRIOR_MEAN
+        ax2.plot(x, v_mean, label="v(x) surrogate", color="blue")
+        ax2.fill_between(
+            x[:, 0],
             v_mean - 1.96 * v_std,
             v_mean + 1.96 * v_std,
             alpha=0.2,
-            label="95% confidence interval",
+            color="blue",
+            label="95% confidence interval"
         )
-        plt.xlabel("x")
-        plt.ylabel("y")
+        ax2.set_title("Function v(x)")
+        ax2.legend()
+
+        # Plot recommendation if required
         if plot_recommendation:
-            plt.scatter(self.next_recommendation(), 0, label="Next recommendation")
-        plt.legend()
-        plt.show()
+            recommendation = self.next_recommendation()
+            ax1.scatter(recommendation, f(recommendation), label="Next recommendation")
+            ax2.scatter(recommendation, v(recommendation), label="Next recommendation")
+
+        return fig, (ax1, ax2)
+
 
 
 # ---
@@ -238,15 +271,22 @@ def main():
     """FOR ILLUSTRATION / TESTING ONLY (NOT CALLED BY CHECKER)."""
     # Init problem
     agent = BO_algo()
+    
+    if SHOW_PLOTS:
+        agent.plot()
 
     # Add initial safe point
     x_init = get_initial_safe_point()
     obj_val = f(x_init)
     cost_val = v(x_init)
-    agent.add_data_point(x_init, obj_val, cost_val)
+    agent.add_data_point([x_init], obj_val, cost_val)
 
     # Loop until budget is exhausted
     for j in range(20):
+        
+        if SHOW_PLOTS:
+            agent.plot()
+        
         # Get next recommendation
         x = agent.next_recommendation()
 
@@ -271,7 +311,7 @@ def main():
         f"Optimal value: 0\nProposed solution {solution}\nSolution value "
         f"{f(solution)}\nRegret {regret}\nUnsafe-evals TODO\n"
     )
-
+    
 
 if __name__ == "__main__":
     main()
