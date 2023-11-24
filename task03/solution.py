@@ -1,6 +1,7 @@
 """Solution."""
 import numpy as np
 from scipy.optimize import fmin_l_bfgs_b
+
 # import additional ...
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF
@@ -18,7 +19,9 @@ OPT_RESTARTS = 40  # number of restarts for the optimization
 SHOW_PLOTS = False
 
 F_GPR_PARAMS = {
-    "kernel": C(0.5, constant_value_bounds='fixed') * Matern(nu=2.5, length_scale=1.0, length_scale_bounds=[0.2,20]) + WhiteKernel(noise_level=0.15**2),
+    "kernel": C(0.5, constant_value_bounds="fixed")
+    * Matern(nu=2.5, length_scale=1.0, length_scale_bounds=[0.2, 20])
+    + WhiteKernel(noise_level=0.15**2),
     "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
     "n_restarts_optimizer": 5,
@@ -29,7 +32,11 @@ F_GPR_PARAMS = {
 }
 
 V_GPR_PARAMS = {
-    "kernel": C(1, constant_value_bounds=[0.5,1.5]) * D(sigma_0=0, sigma_0_bounds='fixed') + C(np.sqrt(2), constant_value_bounds='fixed') * RBF(length_scale=1.0, length_scale_bounds=[0.2,20]) + WhiteKernel(noise_level=0.0001**2),
+    "kernel": C(1, constant_value_bounds=[0.5, 1.5])
+    * D(sigma_0=0, sigma_0_bounds="fixed")
+    + C(np.sqrt(2), constant_value_bounds="fixed")
+    * RBF(length_scale=1.0, length_scale_bounds=[0.2, 20])
+    + WhiteKernel(noise_level=0.0001**2),
     "alpha": 1e-10,
     "optimizer": "fmin_l_bfgs_b",
     "n_restarts_optimizer": 5,
@@ -48,14 +55,14 @@ class BO_algo:
         # TODO: Define all relevant class members for your BO algorithm here.
         self.f = GaussianProcessRegressor(**F_GPR_PARAMS)
         self.v = GaussianProcessRegressor(**V_GPR_PARAMS)
-        
+
         self.l = 1
         self.f_coeff = 2
         self.v_coeff = 2
 
         self.f_data = np.array([])
         self.v_data = np.array([])
-        self.x_data = np.array([]).reshape(-1,1)
+        self.x_data = np.array([]).reshape(-1, 1)
 
         self.random_step_clock = 1
         self.random_step_period = np.inf
@@ -73,13 +80,13 @@ class BO_algo:
         # using functions f and v.
         # In implementing this function, you may use
         # optimize_acquisition_function() defined below.
-        
+
         if self.random_step_clock == self.random_step_period:
             self.random_step_clock = 1
             return np.random.uniform(*DOMAIN[0])
-        
+
         self.random_step_clock += 1
-        
+
         return self.optimize_acquisition_function()
 
     def optimize_acquisition_function(self):
@@ -127,15 +134,15 @@ class BO_algo:
             Value of the acquisition function at x
         """
         x = np.atleast_2d(x)
-        
+
         # TODO: Implement the acquisition function you want to optimize.
-        
+
         y_mean, y_std = self.f.predict(x, return_std=True)
         v_mean, v_std = self.v.predict(x, return_std=True)
-        
+
         f = y_mean + self.f_coeff * y_std
         v = (v_mean + PRIOR_MEAN) + self.v_coeff * v_std
-        
+
         return f - self.l * np.exp(v - SAFETY_THRESHOLD)
 
     def add_data_point(self, x: float, f: float, v: float):
@@ -152,14 +159,14 @@ class BO_algo:
             SA constraint func
         """
         # TODO: Add the observed data {x, f, v} to your model.
-        
+
         self.f_data = np.append(self.f_data, f)
         self.v_data = np.append(self.v_data, v)
         self.x_data = np.vstack([self.x_data, [x]])
-            
+
         self.f.fit(self.x_data, self.f_data)
         self.v.fit(self.x_data, self.v_data - PRIOR_MEAN)
-        
+
     def get_solution(self):
         """
         Return x_opt that is believed to be the maximizer of f.
@@ -201,7 +208,7 @@ class BO_algo:
             f_mean + 1.96 * f_std,
             alpha=0.2,
             color="blue",
-            label="95% confidence interval"
+            label="95% confidence interval",
         )
         ax1.set_title("Function f(x)")
         ax1.legend()
@@ -218,7 +225,7 @@ class BO_algo:
             v_mean + 1.96 * v_std,
             alpha=0.2,
             color="blue",
-            label="95% confidence interval"
+            label="95% confidence interval",
         )
         ax2.set_title("Function v(x)")
         ax2.legend()
@@ -230,7 +237,6 @@ class BO_algo:
             ax2.scatter(recommendation, v(recommendation), label="Next recommendation")
 
         return fig, (ax1, ax2)
-
 
 
 # ---
@@ -271,7 +277,7 @@ def main():
     """FOR ILLUSTRATION / TESTING ONLY (NOT CALLED BY CHECKER)."""
     # Init problem
     agent = BO_algo()
-    
+
     if SHOW_PLOTS:
         agent.plot()
 
@@ -283,10 +289,9 @@ def main():
 
     # Loop until budget is exhausted
     for j in range(20):
-        
         if SHOW_PLOTS:
             agent.plot()
-        
+
         # Get next recommendation
         x = agent.next_recommendation()
 
@@ -311,7 +316,7 @@ def main():
         f"Optimal value: 0\nProposed solution {solution}\nSolution value "
         f"{f(solution)}\nRegret {regret}\nUnsafe-evals TODO\n"
     )
-    
+
 
 if __name__ == "__main__":
     main()
