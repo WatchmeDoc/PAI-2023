@@ -56,7 +56,10 @@ class BO_algo:
         self.f = GaussianProcessRegressor(**F_GPR_PARAMS)
         self.v = GaussianProcessRegressor(**V_GPR_PARAMS)
 
-        self.l = 1
+        # for acquisition function with exp(v-SAFETY_THRESHOLD) use l = 1.0
+        # for acquisition function with v^3 use l = 0.034
+        self.l = 0.034
+        
         self.f_coeff = 2
         self.v_coeff = 2
 
@@ -143,7 +146,10 @@ class BO_algo:
         f = y_mean + self.f_coeff * y_std
         v = (v_mean + PRIOR_MEAN) + self.v_coeff * v_std
 
-        return f - self.l * np.exp(v - SAFETY_THRESHOLD)
+        # use either self.l * v**3 or self.l * np.exp(v - SAFETY_THRESHOLD)
+        val = f - self.l * v**3
+        
+        return val
 
     def add_data_point(self, x: float, f: float, v: float):
         """
