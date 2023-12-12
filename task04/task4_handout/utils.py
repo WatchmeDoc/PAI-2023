@@ -16,6 +16,7 @@ from collections import deque
 from gym.wrappers.rescale_action import RescaleAction
 from gym.wrappers.time_limit import TimeLimit
 
+
 class CustomPendulum(PendulumEnv):
     def __init__(self, g: float = 10.0, eps: float = 0.0, *args, **kwargs):
         super().__init__(g=g, *args, **kwargs)
@@ -32,12 +33,14 @@ class CustomPendulum(PendulumEnv):
         if self.render_mode == "human":
             self.render()
         return self._get_obs(), {}
-    
-class ReplayBuffer():
-    '''
-    This class implements a replay buffer for storing transitions. Upon every transition, 
+
+
+class ReplayBuffer:
+    """
+    This class implements a replay buffer for storing transitions. Upon every transition,
     it saves data into a buffer for later learning, which is later sampled for training the agent.
-    '''
+    """
+
     def __init__(self, min_size, max_size, device):
         self.buffer = deque(maxlen=max_size)
         self.device = device
@@ -57,10 +60,10 @@ class ReplayBuffer():
             r_lst.append([r])
             s_prime_lst.append(s_prime)
 
-        s_batch = torch.tensor(s_lst, dtype=torch.float, device = self.device)
-        a_batch = torch.tensor(a_lst, dtype=torch.float, device = self.device)
-        r_batch = torch.tensor(r_lst, dtype=torch.float, device = self.device)
-        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float, device = self.device)
+        s_batch = torch.tensor(s_lst, dtype=torch.float, device=self.device)
+        a_batch = torch.tensor(a_lst, dtype=torch.float, device=self.device)
+        r_batch = torch.tensor(r_lst, dtype=torch.float, device=self.device)
+        s_prime_batch = torch.tensor(s_prime_lst, dtype=torch.float, device=self.device)
 
         # Normalize rewards
         r_batch = (r_batch - r_batch.mean()) / (r_batch.std() + 1e-7)
@@ -76,27 +79,33 @@ class ReplayBuffer():
 
 
 def get_env(g=10.0, train=True):
-    '''
+    """
     This function sets the environment for the agent.
     :param g: gravity acceleration
     :param train: whether the training or test environment is needed
 
     Returns:
     :return: The environment.
-    '''
+    """
     eps = 0.1 if train else 0.0
-    env = TimeLimit(RescaleAction(CustomPendulum(render_mode='rgb_array', g=g, eps=eps),
-                                  min_action=-1, max_action=1), max_episode_steps=200)
+    env = TimeLimit(
+        RescaleAction(
+            CustomPendulum(render_mode="rgb_array", g=g, eps=eps),
+            min_action=-1,
+            max_action=1,
+        ),
+        max_episode_steps=200,
+    )
     return env
 
 
 def run_episode(env, agent, rec=None, verbose=False, train=True):
-    '''
+    """
     This function runs one episode of the environment with the agent.
     Until the episode is not finished (200 steps), it samples and performs an action,
     stores the transition in the buffer and if the training is started, it also performs
     a training step for the agent.
-    
+
     :param env: The environment to run the episode on.
     :param agent: The agent to use for the episode.
     :param rec: The video recorder to use for recording the episode, if any.
@@ -105,7 +114,7 @@ def run_episode(env, agent, rec=None, verbose=False, train=True):
 
     Returns:
     :return: The episode return.
-    '''
+    """
     mode = "TRAIN" if train else "TEST"
     state, _ = env.reset()
     episode_return, truncated = 0.0, False
