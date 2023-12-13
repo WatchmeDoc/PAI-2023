@@ -228,7 +228,7 @@ def extract_city_area_information(train_x: np.ndarray, test_x: np.ndarray) -> ty
         test features' 2D coordinates, test features' city_area information)
     """
 
-    # TODO: Extract the city_area information from the training and test features
+    # DONE: Extract the city_area information from the training and test features
     train_x_2D = np.array(train_x[:, :2], dtype=float)
     train_x_AREA = np.array(train_x[:, 2], dtype=bool)
     test_x_2D = np.array(test_x[:, :2], dtype=float)

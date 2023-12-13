@@ -35,7 +35,7 @@ class Model(object):
         """
         self.rng = np.random.default_rng(seed=0)
 
-        # TODO: Add custom initialization for your model here if necessary
+        # DONE: Add custom initialization for your model here if necessary
         self.model = GaussianProcessRegressor(**CONFIG, random_state=0)
 
     def make_predictions(self, test_x_2D: np.ndarray, test_x_AREA: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -48,10 +48,10 @@ class Model(object):
             containing your predictions, the GP posterior mean, and the GP posterior stddev (in that order)
         """
 
-        # TODO: Use your GP to estimate the posterior mean and stddev for each city_area here
+        # DONE: Use your GP to estimate the posterior mean and stddev for each city_area here
         gp_mean, gp_std = self.model.predict(test_x_2D, return_std=True)
 
-        # TODO: Use the GP posterior to form your predictions here
+        # DONE: Use the GP posterior to form your predictions here
         predictions = gp_mean
         # predictions += np.multiply(np.multiply(predictions, test_x_AREA), gp_std)
 
@@ -72,7 +72,7 @@ class Model(object):
         train_x_2D_subsample = train_x_2D[random_indices]
         train_y_subsample = train_y[random_indices]
 
-        # TODO: Fit your model here
+        # DONE: Fit your model here
         self.model = self.model.fit(train_x_2D_subsample, train_y_subsample)
         print('Optimized Kernel: ', self.model.kernel_)
 
@@ -188,7 +188,7 @@ def extract_city_area_information(train_x: np.ndarray, test_x: np.ndarray) -> ty
         test features' 2D coordinates, test features' city_area information)
     """
 
-    #TODO: Extract the city_area information from the training and test features
+    #DONE: Extract the city_area information from the training and test features
     train_x_2D = np.array(train_x[:, :2], dtype=float)
     train_x_AREA = np.array(train_x[:, 2], dtype=bool)
     test_x_2D = np.array(test_x[:, :2], dtype=float)
