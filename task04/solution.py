@@ -271,8 +271,9 @@ class Agent:
                     You can find it useful if you want to sample from deterministic policy.
         :return: np.ndarray,, action to apply on the environment, shape (1,)
         """
-        # TODO: Implement a function that returns an action from the policy for the state s.
+        # DONE: Implement a function that returns an action from the policy for the state s.
         s = torch.Tensor(s, device=self.device).unsqueeze(0)
+        # TODO: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
         action = self.actor.get_action_and_log_prob(s, not train)[0]
         action = action.ravel().detach().cpu().numpy()
         assert action.shape == (1,), "Incorrect action shape."
@@ -285,7 +286,7 @@ class Agent:
         self.vb_optimizer.step()
 
     @staticmethod
-    def run_gradient_update_step(object: Union[Actor, Critic], loss: torch.Tensor):
+    def run_gradient_update_step(object: Union[Actor, Critic], loss: torch.Tensor, retain_graph=False):
         """
         This function takes in a object containing trainable parameters and an optimizer,
         and using a given loss, runs one step of gradient update. If you set up trainable parameters
@@ -293,7 +294,7 @@ class Agent:
         :param object: object containing trainable parameters and an optimizer
         """
         object.optimizer.zero_grad()
-        loss.mean().backward()
+        loss.mean().backward(retain_graph=retain_graph)
         object.optimizer.step()
 
     def critic_target_update(
@@ -339,33 +340,30 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2).mean()
+        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2)
         self.run_value_update_step(value_loss)
 
         # change: Implement Critic(s) update here.
         sa_batch = torch.cat((s_batch, a_batch), dim=1)
-        
         q1 = self.critic.model1(sa_batch)
-        target = r_batch + self.gamma * self.value_target(s_prime_batch)
-        critic_loss_1 = (1/2) * (q1 - target).pow(2).mean()
-        self.run_gradient_update_step(self.critic, critic_loss_1)
-        
         q2 = self.critic.model2(sa_batch)
         target = r_batch + self.gamma * self.value_target(s_prime_batch)
-        critic_loss_2 = (1/2) * (q2 - target).pow(2).mean()
+        critic_loss_1 = (1/2) * (q1 - target).pow(2)
+        critic_loss_2 = (1/2) * (q2 - target).pow(2)
+        self.run_gradient_update_step(self.critic, critic_loss_1, retain_graph=True)
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
         # change: Implement Policy update here
-        # Update Value Network
         # TODO: Add gaussian to the state input or the action output
         action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        policy_loss = (log_prob - min_critic).mean()
+        policy_loss = (log_prob - min_critic)
         self.run_gradient_update_step(self.actor, policy_loss)
 
+        # Update Value Network
         self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
 
 
