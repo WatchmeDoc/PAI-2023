@@ -69,6 +69,8 @@ class Actor:
         self.optimizer = None
         self.setup_actor()
 
+        self._noise = 1e-6
+
     def setup_actor(self):
         """
         This function sets up the actor network in the Actor class.
@@ -116,12 +118,14 @@ class Actor:
         dist = Normal(mu, std)
         
         if deterministic:
-            action = mu
+            samples = dist.sample()
         else:
-            action = dist.rsample()
-            
-        log_prob = dist.log_prob(action)
-        action = torch.tanh(action)
+            samples = dist.rsample()
+
+        action = torch.tanh(samples)
+        log_prob = dist.log_prob(samples)
+        log_prob -= torch.log(1-action.pow(2) + self._noise)
+        log_prob = log_prob.sum(1, keepdim=True)
        
         # DONE: Implement this function which returns an action and its log probability.
         # If working with stochastic policies, make sure that its log_std are clamped
@@ -153,32 +157,22 @@ class Critic:
         self.device = device
         self.num_critics = num_critics
 
-        self.model1 = None
-        self.model2 = None
+        self.model = None
         self.optimizer = None
 
         self.setup_critic()
 
     def setup_critic(self):
         # changes here
-        if self.model1 is None:
-            self.model1 = NeuralNetwork(
+        if self.model is None:
+            self.model = NeuralNetwork(
                     input_dim=self.state_dim + self.action_dim,
                     output_dim=1,
                     hidden_size=self.hidden_size,
                     hidden_layers=self.hidden_layers,
                 ).to(self.device)
 
-        if self.model2 is None:
-            self.model2 = NeuralNetwork(
-                input_dim=self.state_dim + self.action_dim,
-                output_dim=1,
-                hidden_size=self.hidden_size,
-                hidden_layers=self.hidden_layers,
-            ).to(self.device)
-
-        critic_params = list(self.model1.parameters()) + list(self.model2.parameters())
-        self.optimizer = optim.Adam(critic_params, lr=self.critic_lr)
+            self.optimizer = optim.Adam(self.model.parameters(), lr=self.critic_lr)
 
 class TrainableParameter:
     """
@@ -237,7 +231,8 @@ class Agent:
             "action_dim": self.action_dim,
             "device": self.device,
         }
-        self.critic = None
+        self.critic_1 = None
+        self.critic_2 = None
 
         self._value_net_params = {
             "input_dim": self.state_dim,
@@ -256,8 +251,10 @@ class Agent:
         # changes here
         if self.actor is None:
             self.actor = Actor(**self._actor_params)
-        if self.critic is None:
-            self.critic = Critic(**self._critic_params)
+        if self.critic_1 is None:
+            self.critic_1 = Critic(**self._critic_params)
+        if self.critic_2 is None:
+            self.critic_2 = Critic(**self._critic_params)
         if self.value_base is None:
             self.value_base = NeuralNetwork(**self._value_net_params).to(self.device)
             self.vb_optimizer = optim.Adam(self.value_base.parameters(), lr=0.0003)
@@ -335,33 +332,37 @@ class Agent:
 
         # Update Value Network
         # DONE: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
-        action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
+        action, log_prob = self.actor.get_action_and_log_prob(s_batch, True)
         sa_batch = torch.cat((s_batch, action), dim=1)
-        q1 = self.critic.model1(sa_batch)
-        q2 = self.critic.model2(sa_batch)
+        q1 = self.critic_1.model(sa_batch)
+        q2 = self.critic_2.model(sa_batch)
         min_critic = torch.minimum(q1, q2)
         value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2)
         self.run_value_update_step(value_loss)
-
-        # change: Implement Critic(s) update here.
-        sa_batch = torch.cat((s_batch, a_batch), dim=1)
-        q1 = self.critic.model1(sa_batch)
-        q2 = self.critic.model2(sa_batch)
-        target = r_batch + self.gamma * self.value_target(s_prime_batch)
-        critic_loss_1 = (1/2) * (q1 - target).pow(2)
-        critic_loss_2 = (1/2) * (q2 - target).pow(2)
-        self.run_gradient_update_step(self.critic, critic_loss_1, retain_graph=True)
-        self.run_gradient_update_step(self.critic, critic_loss_2)
 
         # change: Implement Policy update here
         # TODO: Add gaussian to the state input or the action output
         action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
-        q1 = self.critic.model1(sa_batch)
-        q2 = self.critic.model2(sa_batch)
+        q1 = self.critic_1.model(sa_batch)
+        q2 = self.critic_2.model(sa_batch)
         min_critic = torch.minimum(q1, q2)
         policy_loss = (log_prob - min_critic)
         self.run_gradient_update_step(self.actor, policy_loss)
+
+        # change: Implement Critic(s) update here.
+        self.critic_1.optimizer.zero_grad()
+        self.critic_2.optimizer.zero_grad()
+        sa_batch = torch.cat((s_batch, a_batch), dim=1)
+        q1 = self.critic_1.model(sa_batch)
+        q2 = self.critic_2.model(sa_batch)
+        target = r_batch * 2 + self.gamma * self.value_target(s_prime_batch)
+        critic_loss_1 = (1 / 2) * (q1 - target).pow(2)
+        critic_loss_2 = (1 / 2) * (q2 - target).pow(2)
+        critic_loss = critic_loss_1 + critic_loss_2
+        critic_loss.mean().backward()
+        self.critic_1.optimizer.step()
+        self.critic_2.optimizer.step()
 
         # Update Value Network
         self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
