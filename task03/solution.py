@@ -47,12 +47,12 @@ V_GPR_PARAMS = {
 }
 
 
-# TODO: implement a self-contained solution in the BO_algo class.
+# DONE: implement a self-contained solution in the BO_algo class.
 # NOTE: main() is not called by the checker.
 class BO_algo:
     def __init__(self):
         """Initializes the algorithm with a parameter configuration."""
-        # TODO: Define all relevant class members for your BO algorithm here.
+        # DONE: Define all relevant class members for your BO algorithm here.
         self.f = GaussianProcessRegressor(**F_GPR_PARAMS)
         self.v = GaussianProcessRegressor(**V_GPR_PARAMS)
 
@@ -79,7 +79,7 @@ class BO_algo:
         recommendation: float
             the next point to evaluate
         """
-        # TODO: Implement the function which recommends the next point to query
+        # DONE: Implement the function which recommends the next point to query
         # using functions f and v.
         # In implementing this function, you may use
         # optimize_acquisition_function() defined below.
@@ -138,7 +138,7 @@ class BO_algo:
         """
         x = np.atleast_2d(x)
 
-        # TODO: Implement the acquisition function you want to optimize.
+        # DONE: Implement the acquisition function you want to optimize.
 
         y_mean, y_std = self.f.predict(x, return_std=True)
         v_mean, v_std = self.v.predict(x, return_std=True)
@@ -164,7 +164,7 @@ class BO_algo:
         v: float
             SA constraint func
         """
-        # TODO: Add the observed data {x, f, v} to your model.
+        # DONE: Add the observed data {x, f, v} to your model.
 
         self.f_data = np.append(self.f_data, f)
         self.v_data = np.append(self.v_data, v)
@@ -182,7 +182,7 @@ class BO_algo:
         solution: float
             the optimal solution of the problem
         """
-        # TODO: Return your predicted safe optimum of f.
+        # DONE: Return your predicted safe optimum of f.
         v_mask = self.v_data < SAFETY_THRESHOLD
         fs = self.f_data[v_mask]
         xs = self.x_data[v_mask]
@@ -320,7 +320,7 @@ def main():
 
     print(
         f"Optimal value: 0\nProposed solution {solution}\nSolution value "
-        f"{f(solution)}\nRegret {regret}\nUnsafe-evals TODO\n"
+        f"{f(solution)}\nRegret {regret}\n"
     )
 
 
