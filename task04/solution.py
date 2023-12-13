@@ -77,7 +77,6 @@ class Actor:
                 output_dim=2*self.action_dim,
                 hidden_size=self.hidden_size,
                 hidden_layers=self.hidden_layers,
-                activation=None,
             ).to(self.device)   
             
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.actor_lr)
@@ -253,7 +252,7 @@ class Agent:
         }   
 
         self.gamma = 0.99
-        self.alpha = 0.2
+        self.alpha = 0.05
         
         self.setup_agent()
 
