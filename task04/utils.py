@@ -116,7 +116,13 @@ def run_episode(env, agent, rec=None, verbose=False, train=True):
     :return: The episode return.
     """
     mode = "TRAIN" if train else "TEST"
-    state, _ = env.reset()
+    
+    if mode == "TEST":
+        seed = np.random.randint(0, 1000)
+    else:
+        seed = 0
+    state, _ = env.reset(seed=seed)
+        
     episode_return, truncated = 0.0, False
     while not truncated:
         action = agent.get_action(state, train)
