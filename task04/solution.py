@@ -118,7 +118,7 @@ class Actor:
         dist = Normal(mu, std)
         
         if deterministic:
-            samples = dist.sample()
+            samples = mu
         else:
             samples = dist.rsample()
 
@@ -243,7 +243,7 @@ class Agent:
         self.value_base = None
         self.vb_optimizer = None
         self.value_target = None
-
+        self.alpha = 0.5
         self.gamma = 0.99
         self.setup_agent()
 
@@ -356,13 +356,11 @@ class Agent:
         sa_batch = torch.cat((s_batch, a_batch), dim=1)
         q1 = self.critic_1.model(sa_batch)
         q2 = self.critic_2.model(sa_batch)
-        target = r_batch * 2 + self.gamma * self.value_target(s_prime_batch)
+        target = (1 / self.alpha) * r_batch + self.gamma * self.value_target(s_prime_batch)
         critic_loss_1 = (1 / 2) * (q1 - target).pow(2)
         critic_loss_2 = (1 / 2) * (q2 - target).pow(2)
-        critic_loss = critic_loss_1 + critic_loss_2
-        critic_loss.mean().backward()
-        self.critic_1.optimizer.step()
-        self.critic_2.optimizer.step()
+        self.run_gradient_update_step(self.critic_1, critic_loss_1)
+        self.run_gradient_update_step(self.critic_2, critic_loss_2)
 
         # Update Value Network
         self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
