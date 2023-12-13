@@ -122,6 +122,7 @@ class Actor:
             action = mu
         else:
             action = dist.rsample()
+        action = torch.clamp(action, -1, 1)
         log_prob = dist.log_prob(action)
        
         # DONE: Implement this function which returns an action and its log probability.
@@ -345,12 +346,15 @@ class Agent:
 
         # change: Implement Critic(s) update here.
         sa_batch = torch.cat((s_batch, a_batch), dim=1)
+        
         q1 = self.critic.model1(sa_batch)
-        q2 = self.critic.model2(sa_batch)
         target = r_batch + self.gamma * self.value_target(s_prime_batch)
         critic_loss_1 = (1/2) * (q1 - target).pow(2).mean()
-        critic_loss_2 = (1/2) * (q2 - target).pow(2).mean()
         self.run_gradient_update_step(self.critic, critic_loss_1)
+        
+        q2 = self.critic.model2(sa_batch)
+        target = r_batch + self.gamma * self.value_target(s_prime_batch)
+        critic_loss_2 = (1/2) * (q2 - target).pow(2).mean()
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
         # change: Implement Policy update here
@@ -362,7 +366,7 @@ class Agent:
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
         policy_loss = (log_prob - min_critic).mean()
-        self.run_gradient_update_step(self.actor.model, policy_loss)
+        self.run_gradient_update_step(self.actor, policy_loss)
 
         self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
 
