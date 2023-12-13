@@ -116,12 +116,14 @@ class Actor:
         dist = Normal(mu, std)
         
         if deterministic:
-            action = mu
+            sample = mu
         else:
-            action = dist.rsample()
+            sample = dist.rsample()
             
-        log_prob = dist.log_prob(action)
-        action = torch.tanh(action)
+        action = torch.tanh(sample)   
+        log_prob = dist.log_prob(sample)
+        log_prob -= torch.log(1-action.pow(2) + 1e-6)
+        log_prob = log_prob.sum(1, keepdim=True)
        
         # DONE: Implement this function which returns an action and its log probability.
         # If working with stochastic policies, make sure that its log_std are clamped
@@ -250,6 +252,7 @@ class Agent:
         self.value_target = None
 
         self.gamma = 0.99
+        self.alpha = 0.2
         self.setup_agent()
 
     def setup_agent(self):
@@ -274,7 +277,7 @@ class Agent:
         # DONE: Implement a function that returns an action from the policy for the state s.
         s = torch.Tensor(s, device=self.device).unsqueeze(0)
         # TODO: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
-        action = self.actor.get_action_and_log_prob(s, not train)[0]
+        action = self.actor.get_action_and_log_prob(s, False)[0]
         action = action.ravel().detach().cpu().numpy()
         assert action.shape == (1,), "Incorrect action shape."
         assert isinstance(action, np.ndarray), "Action dtype must be np.ndarray"
@@ -340,7 +343,7 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2)
+        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - self.alpha * log_prob)).pow(2)
         self.run_value_update_step(value_loss)
 
         # change: Implement Critic(s) update here.
@@ -360,7 +363,7 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        policy_loss = (log_prob - min_critic)
+        policy_loss = (self.alpha * log_prob - min_critic)
         self.run_gradient_update_step(self.actor, policy_loss)
 
         # Update Value Network
