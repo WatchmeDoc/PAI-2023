@@ -332,7 +332,7 @@ class Agent:
 
         # Update Value Network
         # DONE: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
-        action, log_prob = self.actor.get_action_and_log_prob(s_batch, True)
+        action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic_1.model(sa_batch)
         q2 = self.critic_2.model(sa_batch)
@@ -359,9 +359,8 @@ class Agent:
         target = (1 / self.alpha) * r_batch + self.gamma * self.value_target(s_prime_batch)
         critic_loss_1 = (1 / 2) * (q1 - target).pow(2)
         critic_loss_2 = (1 / 2) * (q2 - target).pow(2)
-        self.run_gradient_update_step(self.critic_1, critic_loss_1)
+        self.run_gradient_update_step(self.critic_1, critic_loss_1, retain_graph=True)
         self.run_gradient_update_step(self.critic_2, critic_loss_2)
-
         # Update Value Network
         self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
 
