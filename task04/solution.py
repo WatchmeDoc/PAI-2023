@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 from gym.wrappers.monitoring.video_recorder import VideoRecorder
 import warnings
-from typing import Union
+from typing import Union, Optional
 from utils import ReplayBuffer, get_env, run_episode
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -24,7 +24,7 @@ class NeuralNetwork(nn.Module):
         output_dim: int,
         hidden_size: int,
         hidden_layers: int,
-        activation: str,
+        activation: Optional[str] = None,
     ):
         super(NeuralNetwork, self).__init__()
 
@@ -36,7 +36,9 @@ class NeuralNetwork(nn.Module):
             self._layers.append(nn.Linear(hidden_size, hidden_size))
             self._layers.append(nn.ReLU())
         self._layers.append(nn.Linear(hidden_size, output_dim))
-        self.model = nn.Sequential(self._layers)
+        if activation is not None:
+            self._layers.append(getattr(nn, activation)())
+        self.model = nn.Sequential(*self._layers)
 
     def forward(self, s: torch.Tensor) -> torch.Tensor:
         # change: Implement the forward pass for the neural network you have defined.
@@ -75,11 +77,12 @@ class Actor:
         if self.model is None:
             self.model = NeuralNetwork(
                 input_dim=self.state_dim,
-                output_dim=self.action_dim,
+                output_dim=2*self.action_dim,
                 hidden_size=self.hidden_size,
                 hidden_layers=self.hidden_layers,
-                activation="relu",
-            ).to(self.device)
+                activation=None,
+            ).to(self.device)   
+            
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.actor_lr)
 
     def clamp_log_std(self, log_std: torch.Tensor) -> torch.Tensor:
@@ -95,7 +98,7 @@ class Actor:
     ) -> (torch.Tensor, torch.Tensor):
         """
         :param state: torch.Tensor, state of the agent
-        :param deterministic: boolean, if true return a deterministic action
+        :param determini stic: boolean, if true return a deterministic action
                                 otherwise sample from the policy distribution.
         Returns:
         :param action: torch.Tensor, action the policy returns for the state.
@@ -104,9 +107,24 @@ class Actor:
         assert (
             state.shape == (3,) or state.shape[1] == self.state_dim
         ), "State passed to this method has a wrong shape"
-        # TODO: sample using mu and sigma if not deterministic else mu. log_prob ??
-        action, log_prob = torch.zeros(state.shape[0]), torch.ones(state.shape[0])
-        # TODO: Implement this function which returns an action and its log probability.
+        
+        out = self.model(state)
+        unscaled_mu, log_std = out[:, :self.action_dim], out[:, self.action_dim:]
+        
+        mu = torch.tanh(unscaled_mu)
+        log_std = self.clamp_log_std(log_std)
+        std = torch.exp(log_std)
+        
+        # TODO: Create multidimensional distribution for the whole batch
+        dist = Normal(mu, std)
+        
+        if deterministic:
+            action = mu
+        else:
+            action = dist.rsample()
+        log_prob = dist.log_prob(action)
+       
+        # DONE: Implement this function which returns an action and its log probability.
         # If working with stochastic policies, make sure that its log_std are clamped
         # using the clamp_log_std function.
         assert action.shape == (state.shape[0], self.action_dim) and log_prob.shape == (
@@ -150,7 +168,6 @@ class Critic:
                     output_dim=1,
                     hidden_size=self.hidden_size,
                     hidden_layers=self.hidden_layers,
-                    activation="relu",
                 ).to(self.device)
 
         if self.model2 is None:
@@ -159,7 +176,6 @@ class Critic:
                 output_dim=1,
                 hidden_size=self.hidden_size,
                 hidden_layers=self.hidden_layers,
-                activation="relu",
             ).to(self.device)
 
         critic_params = list(self.model1.parameters()) + list(self.model2.parameters())
@@ -229,7 +245,6 @@ class Agent:
             "output_dim": 1,
             "hidden_size": self._critic_params["hidden_size"],
             "hidden_layers": self._critic_params["hidden_layers"],
-            "activation": "relu",
         }
         self.value_base = None
         self.vb_optimizer = None
@@ -258,8 +273,9 @@ class Agent:
         :return: np.ndarray,, action to apply on the environment, shape (1,)
         """
         # TODO: Implement a function that returns an action from the policy for the state s.
-        action = self.actor.get_action_and_log_prob(torch.tensor(s), not train)[0]
-
+        s = torch.Tensor(s, device=self.device).unsqueeze(0)
+        action = self.actor.get_action_and_log_prob(s, not train)[0]
+        action = action.ravel().detach().cpu().numpy()
         assert action.shape == (1,), "Incorrect action shape."
         assert isinstance(action, np.ndarray), "Action dtype must be np.ndarray"
         return action
@@ -310,7 +326,7 @@ class Agent:
         from the replay buffer,and then updates the policy and critic networks
         using the sampled batch.
         """
-        # TODO: Implement one step of training for the agent.
+        # DONE: Implement one step of training for the agent.
         # Hint: You can use the run_gradient_update_step for each policy and critic.
         # Example: self.run_gradient_update_step(self.policy, policy_loss)
         # Batch sampling
@@ -318,30 +334,29 @@ class Agent:
         s_batch, a_batch, r_batch, s_prime_batch = batch
 
         # Update Value Network
-        # TODO: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
+        # DONE: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
         action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        target_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2).mean()
-        self.run_value_update_step(target_loss)
+        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - log_prob)).pow(2).mean()
+        self.run_value_update_step(value_loss)
 
         # change: Implement Critic(s) update here.
         sa_batch = torch.cat((s_batch, a_batch), dim=1)
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         target = r_batch + self.gamma * self.value_target(s_prime_batch)
-        critic_loss_1 = (1/2 * (q1 - target)).pow(2).mean()
-        critic_loss_2 = (1/2 * (q2 - target)).pow(2).mean()
+        critic_loss_1 = (1/2) * (q1 - target).pow(2).mean()
+        critic_loss_2 = (1/2) * (q2 - target).pow(2).mean()
         self.run_gradient_update_step(self.critic, critic_loss_1)
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
         # change: Implement Policy update here
         # Update Value Network
-        action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         # TODO: Add gaussian to the state input or the action output
-
+        action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
