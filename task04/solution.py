@@ -107,23 +107,21 @@ class Actor:
         assert (
             state.shape == (3,) or state.shape[1] == self.state_dim
         ), "State passed to this method has a wrong shape"
-        
+             
         out = self.model(state)
-        unscaled_mu, log_std = out[:, :self.action_dim], out[:, self.action_dim:]
+        mu, log_std = out[:, :self.action_dim], out[:, self.action_dim:]
         
-        mu = torch.tanh(unscaled_mu)
         log_std = self.clamp_log_std(log_std)
-        std = torch.exp(log_std)
-        
-        # TODO: Create multidimensional distribution for the whole batch
+        std = torch.exp(log_std) 
         dist = Normal(mu, std)
         
         if deterministic:
             action = mu
         else:
             action = dist.rsample()
-        action = torch.clamp(action, -1, 1)
+            
         log_prob = dist.log_prob(action)
+        action = torch.tanh(action)
        
         # DONE: Implement this function which returns an action and its log probability.
         # If working with stochastic policies, make sure that its log_std are clamped
@@ -379,7 +377,7 @@ if __name__ == "__main__":
 
     # You may set the save_video param to output the video of one of the evalution episodes, or
     # you can disable console printing during training and testing by setting verbose to False.
-    save_video = False
+    save_video = True
     verbose = True
 
     agent = Agent()
