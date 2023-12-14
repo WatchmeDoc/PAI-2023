@@ -212,7 +212,7 @@ class Agent:
         # Environment variables. You don't need to change this.
         self.state_dim = 3  # [cos(theta), sin(theta), theta_dot]
         self.action_dim = 1  # [torque] in[-1,1]
-        self.batch_size = 200
+        self.batch_size = 500
         self.min_buffer_size = 1000
         self.max_buffer_size = 100000
         # If your PC possesses a GPU, you should be able to use it for training,
@@ -224,16 +224,16 @@ class Agent:
         )
         self.actor = None
         self._actor_params = {
-            "hidden_size": 256,
-            "hidden_layers": 2,
+            "hidden_size": 512,
+            "hidden_layers": 4,
             "actor_lr": 0.0003,
             "state_dim": self.state_dim,
             "action_dim": self.action_dim,
             "device": self.device,
         }
         self._critic_params = {
-            "hidden_size": 256,
-            "hidden_layers": 2,
+            "hidden_size": 512,
+            "hidden_layers": 4,
             "critic_lr": 0.0003,
             "state_dim": self.state_dim,
             "action_dim": self.action_dim,
@@ -252,7 +252,7 @@ class Agent:
         self.value_target = None
 
         self.gamma = 0.99
-        self.alpha = 0.2
+        self.alpha = 0.01
         self.setup_agent()
 
     def setup_agent(self):
@@ -276,7 +276,6 @@ class Agent:
         """
         # DONE: Implement a function that returns an action from the policy for the state s.
         s = torch.Tensor(s, device=self.device).unsqueeze(0)
-        # TODO: Investigate whether to use deterministic (MAP Estimate) or sample from the policy distribution
         action = self.actor.get_action_and_log_prob(s, False)[0]
         action = action.ravel().detach().cpu().numpy()
         assert action.shape == (1,), "Incorrect action shape."
@@ -357,7 +356,6 @@ class Agent:
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
         # change: Implement Policy update here
-        # TODO: Add gaussian to the state input or the action output
         action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic.model1(sa_batch)
