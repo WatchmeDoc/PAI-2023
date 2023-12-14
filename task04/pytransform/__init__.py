@@ -2,23 +2,13 @@
 # code needn't import anything
 import os
 import platform
-import sys
 import struct
-
+import sys
 # Because ctypes is new from Python 2.5, so pytransform doesn't work
 # before Python 2.5
 #
-from ctypes import (
-    cdll,
-    c_char,
-    c_char_p,
-    c_int,
-    c_void_p,
-    pythonapi,
-    py_object,
-    PYFUNCTYPE,
-    CFUNCTYPE,
-)
+from ctypes import (CFUNCTYPE, PYFUNCTYPE, c_char, c_char_p, c_int, c_void_p,
+                    cdll, py_object, pythonapi)
 from fnmatch import fnmatch
 
 #

@@ -6,13 +6,13 @@ IMPORTANT NOTE: CHANGING THIS FILE OR YOUR LOCAL EVALUATION MIGHT NOT WORK. CHAN
 AFFECT YOUR SUBMISSION RESULT IN THE CHECKER. 
 
 """
+import random
+from collections import deque
 from typing import Optional
 
 import numpy as np
-from gym.envs.classic_control import PendulumEnv
 import torch
-import random
-from collections import deque
+from gym.envs.classic_control import PendulumEnv
 from gym.wrappers.rescale_action import RescaleAction
 from gym.wrappers.time_limit import TimeLimit
 
@@ -117,7 +117,7 @@ def run_episode(env, agent, rec=None, verbose=False, train=True, seed=0):
     """
     mode = "TRAIN" if train else "TEST"
     state, _ = env.reset(seed=seed)
-        
+
     episode_return, truncated = 0.0, False
     while not truncated:
         action = agent.get_action(state, train)

@@ -1,11 +1,13 @@
-import torch
-import torch.optim as optim
-from torch.distributions import Normal
-import torch.nn as nn
-import numpy as np
-from gym.wrappers.monitoring.video_recorder import VideoRecorder
 import warnings
-from typing import Union, Optional
+from typing import Optional, Union
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
+from torch.distributions import Normal
+
 from utils import ReplayBuffer, get_env, run_episode
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -74,11 +76,11 @@ class Actor:
         if self.model is None:
             self.model = NeuralNetwork(
                 input_dim=self.state_dim,
-                output_dim=2*self.action_dim,
+                output_dim=2 * self.action_dim,
                 hidden_size=self.hidden_size,
                 hidden_layers=self.hidden_layers,
-            ).to(self.device)   
-            
+            ).to(self.device)
+
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.actor_lr)
 
     def clamp_log_std(self, log_std: torch.Tensor) -> torch.Tensor:
@@ -103,24 +105,24 @@ class Actor:
         assert (
             state.shape == (3,) or state.shape[1] == self.state_dim
         ), "State passed to this method has a wrong shape"
-             
+
         out = self.model(state)
-        mu, log_std = out[:, :self.action_dim], out[:, self.action_dim:]
-        
+        mu, log_std = out[:, : self.action_dim], out[:, self.action_dim :]
+
         log_std = self.clamp_log_std(log_std)
-        std = torch.exp(log_std) 
+        std = torch.exp(log_std)
         dist = Normal(mu, std)
-        
+
         if deterministic:
             sample = mu
         else:
             sample = dist.rsample()
-            
-        action = torch.tanh(sample)   
+
+        action = torch.tanh(sample)
         log_prob = dist.log_prob(sample)
-        log_prob -= torch.log(1-action.pow(2) + 1e-6)
+        log_prob -= torch.log(1 - action.pow(2) + 1e-6)
         log_prob = log_prob.sum(1, keepdim=True)
-       
+
         # DONE: Implement this function which returns an action and its log probability.
         # If working with stochastic policies, make sure that its log_std are clamped
         # using the clamp_log_std function.
@@ -161,11 +163,11 @@ class Critic:
         # changes here
         if self.model1 is None:
             self.model1 = NeuralNetwork(
-                    input_dim=self.state_dim + self.action_dim,
-                    output_dim=1,
-                    hidden_size=self.hidden_size,
-                    hidden_layers=self.hidden_layers,
-                ).to(self.device)
+                input_dim=self.state_dim + self.action_dim,
+                output_dim=1,
+                hidden_size=self.hidden_size,
+                hidden_layers=self.hidden_layers,
+            ).to(self.device)
 
         if self.model2 is None:
             self.model2 = NeuralNetwork(
@@ -177,6 +179,7 @@ class Critic:
 
         critic_params = list(self.model1.parameters()) + list(self.model2.parameters())
         self.optimizer = optim.Adam(critic_params, lr=self.critic_lr)
+
 
 class TrainableParameter:
     """
@@ -286,7 +289,9 @@ class Agent:
         self.vb_optimizer.step()
 
     @staticmethod
-    def run_gradient_update_step(object: Union[Actor, Critic], loss: torch.Tensor, retain_graph=False):
+    def run_gradient_update_step(
+        object: Union[Actor, Critic], loss: torch.Tensor, retain_graph=False
+    ):
         """
         This function takes in a object containing trainable parameters and an optimizer,
         and using a given loss, runs one step of gradient update. If you set up trainable parameters
@@ -340,7 +345,9 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - self.alpha * log_prob)).pow(2)
+        value_loss = (1 / 2) * (
+            self.value_base(s_batch) - (min_critic - self.alpha * log_prob)
+        ).pow(2)
         self.run_value_update_step(value_loss)
 
         # DONE: Implement Critic(s) update here.
@@ -348,8 +355,8 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         target = r_batch + self.gamma * self.value_target(s_prime_batch)
-        critic_loss_1 = (1/2) * (q1 - target).pow(2)
-        critic_loss_2 = (1/2) * (q2 - target).pow(2)
+        critic_loss_1 = (1 / 2) * (q1 - target).pow(2)
+        critic_loss_2 = (1 / 2) * (q2 - target).pow(2)
         self.run_gradient_update_step(self.critic, critic_loss_1, retain_graph=True)
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
@@ -359,11 +366,16 @@ class Agent:
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
         min_critic = torch.minimum(q1, q2)
-        policy_loss = (self.alpha * log_prob - min_critic)
+        policy_loss = self.alpha * log_prob - min_critic
         self.run_gradient_update_step(self.actor, policy_loss)
 
         # Update Value Network
-        self.critic_target_update(base_net=self.value_base, target_net=self.value_target, tau=0.005, soft_update=True)
+        self.critic_target_update(
+            base_net=self.value_base,
+            target_net=self.value_target,
+            tau=0.005,
+            soft_update=True,
+        )
 
 
 # This main function is provided here to enable some basic testing.
@@ -400,7 +412,9 @@ if __name__ == "__main__":
             seed = 0
         rec = video_rec if (save_video and EP == TEST_EPISODES - 1) else None
         with torch.no_grad():
-            episode_return = run_episode(env, agent, rec, verbose, train=False, seed=seed)
+            episode_return = run_episode(
+                env, agent, rec, verbose, train=False, seed=seed
+            )
         test_returns.append(episode_return)
 
     avg_test_return = np.mean(np.array(test_returns))
