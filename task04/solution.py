@@ -24,11 +24,10 @@ class NeuralNetwork(nn.Module):
         output_dim: int,
         hidden_size: int,
         hidden_layers: int,
-        activation: Optional[str] = None,
     ):
         super(NeuralNetwork, self).__init__()
 
-        # change: Implement this function which should define a neural network
+        # DONE: Implement this function which should define a neural network
         # with a variable number of hidden layers and hidden units.
         # Here you should define layers which your network will use.
         self._layers = [nn.Linear(input_dim, hidden_size), nn.ReLU()]
@@ -36,12 +35,10 @@ class NeuralNetwork(nn.Module):
             self._layers.append(nn.Linear(hidden_size, hidden_size))
             self._layers.append(nn.ReLU())
         self._layers.append(nn.Linear(hidden_size, output_dim))
-        if activation is not None:
-            self._layers.append(getattr(nn, activation)())
         self.model = nn.Sequential(*self._layers)
 
     def forward(self, s: torch.Tensor) -> torch.Tensor:
-        # change: Implement the forward pass for the neural network you have defined.
+        # DONE: Implement the forward pass for the neural network you have defined.
         return self.model(s)
 
 
@@ -73,14 +70,13 @@ class Actor:
         """
         This function sets up the actor network in the Actor class.
         """
-        # change: Implement this function which sets up the actor network.
+        # DONE: Implement this function which sets up the actor network.
         if self.model is None:
             self.model = NeuralNetwork(
                 input_dim=self.state_dim,
                 output_dim=2*self.action_dim,
                 hidden_size=self.hidden_size,
                 hidden_layers=self.hidden_layers,
-                activation=None,
             ).to(self.device)   
             
             self.optimizer = optim.Adam(self.model.parameters(), lr=self.actor_lr)
@@ -215,6 +211,7 @@ class Agent:
         self.batch_size = 500
         self.min_buffer_size = 1000
         self.max_buffer_size = 100000
+
         # If your PC possesses a GPU, you should be able to use it for training,
         # as self.device should be 'cuda' in that case.
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -222,6 +219,7 @@ class Agent:
         self.memory = ReplayBuffer(
             self.min_buffer_size, self.max_buffer_size, self.device
         )
+
         self.actor = None
         self._actor_params = {
             "hidden_size": 512,
@@ -345,7 +343,7 @@ class Agent:
         value_loss = (1/2) * (self.value_base(s_batch) - (min_critic - self.alpha * log_prob)).pow(2)
         self.run_value_update_step(value_loss)
 
-        # change: Implement Critic(s) update here.
+        # DONE: Implement Critic(s) update here.
         sa_batch = torch.cat((s_batch, a_batch), dim=1)
         q1 = self.critic.model1(sa_batch)
         q2 = self.critic.model2(sa_batch)
@@ -355,7 +353,7 @@ class Agent:
         self.run_gradient_update_step(self.critic, critic_loss_1, retain_graph=True)
         self.run_gradient_update_step(self.critic, critic_loss_2)
 
-        # change: Implement Policy update here
+        # DONE: Implement Policy update here
         action, log_prob = self.actor.get_action_and_log_prob(s_batch, False)
         sa_batch = torch.cat((s_batch, action), dim=1)
         q1 = self.critic.model1(sa_batch)
@@ -378,6 +376,7 @@ if __name__ == "__main__":
     # you can disable console printing during training and testing by setting verbose to False.
     save_video = True
     verbose = True
+    use_random_init_state = False
 
     agent = Agent()
     env = get_env(g=10.0, train=True)
@@ -395,9 +394,13 @@ if __name__ == "__main__":
         video_rec = VideoRecorder(env, "pendulum_episode.mp4")
 
     for EP in range(TEST_EPISODES):
+        if use_random_init_state:
+            seed = np.random.randint(0, 100000)
+        else:
+            seed = 0
         rec = video_rec if (save_video and EP == TEST_EPISODES - 1) else None
         with torch.no_grad():
-            episode_return = run_episode(env, agent, rec, verbose, train=False)
+            episode_return = run_episode(env, agent, rec, verbose, train=False, seed=seed)
         test_returns.append(episode_return)
 
     avg_test_return = np.mean(np.array(test_returns))

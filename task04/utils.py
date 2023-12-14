@@ -99,7 +99,7 @@ def get_env(g=10.0, train=True):
     return env
 
 
-def run_episode(env, agent, rec=None, verbose=False, train=True):
+def run_episode(env, agent, rec=None, verbose=False, train=True, seed=0):
     """
     This function runs one episode of the environment with the agent.
     Until the episode is not finished (200 steps), it samples and performs an action,
@@ -116,11 +116,6 @@ def run_episode(env, agent, rec=None, verbose=False, train=True):
     :return: The episode return.
     """
     mode = "TRAIN" if train else "TEST"
-    
-    if mode == "TEST":
-        seed = np.random.randint(0, 1000)
-    else:
-        seed = 0
     state, _ = env.reset(seed=seed)
         
     episode_return, truncated = 0.0, False
